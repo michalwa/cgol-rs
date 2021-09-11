@@ -63,10 +63,13 @@ impl<R: Ruleset> Automaton<R> {
         col: usize,
         row: usize,
         new: R::State,
-        update_neighbor: fn(&mut R::NeighborData),
+        update_neighbor: UpdateNeighbor<R>,
     ) {
         self.cells[0][(col, row)] = new;
-        self.update_neighbors(col, row, update_neighbor);
+
+        if let Some(update_neighbor) = update_neighbor.into() {
+            self.update_neighbors(col, row, update_neighbor);
+        }
     }
 
     /// Returns current cell state at the specified coordinates
@@ -86,5 +89,12 @@ impl<R: Ruleset> Automaton<R> {
                 }
             }
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.cells[0].clear();
+        self.cells[1].clear();
+        self.neighbor_data[0].clear();
+        self.neighbor_data[1].clear();
     }
 }

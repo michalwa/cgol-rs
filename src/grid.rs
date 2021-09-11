@@ -21,6 +21,16 @@ impl<T> Grid<T> {
         }
     }
 
+    /// Sets each cell to the default value
+    pub fn clear(&mut self)
+    where
+        T: Default,
+    {
+        for (_, c) in self {
+            *c = Default::default();
+        }
+    }
+
     /// Swaps values with another grid, given its dimensions are the same
     pub fn swap(&mut self, other: &mut Self) {
         assert!(self.cols == other.cols && self.rows == other.rows);

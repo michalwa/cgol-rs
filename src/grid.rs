@@ -1,6 +1,7 @@
-use std::{iter::Zip, mem, ops::{Index, IndexMut}};
+use std::{fmt, iter::Zip, mem, ops::{Index, IndexMut}};
 
 /// Dynamically allocated 2d array
+#[derive(Clone, PartialEq, Eq)]
 pub struct Grid<T> {
     cols: usize,
     rows: usize,
@@ -37,8 +38,33 @@ impl<T> Grid<T> {
         }
     }
 
+    pub fn clone_from(&mut self, src: &Self)
+    where
+        T: Clone,
+    {
+        assert!(self.cols == src.cols && self.rows == src.rows);
+        self.data.clone_from_slice(&src.data);
+    }
+
     pub const fn cols(&self) -> usize { self.cols }
     pub const fn rows(&self) -> usize { self.rows }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Grid<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("[")?;
+        for row in 0..self.rows {
+            if row > 0 {
+                f.write_str(",\n ")?;
+            }
+
+            f.debug_list()
+                .entries((0..self.cols).map(|col| &self.data[row * self.cols + col]))
+                .finish()?;
+        }
+        f.write_str("]")?;
+        Ok(())
+    }
 }
 
 impl<T> Index<(usize, usize)> for Grid<T> {

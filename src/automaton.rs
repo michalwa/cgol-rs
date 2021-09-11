@@ -11,7 +11,7 @@ pub trait Ruleset {
 /// Stores cell state & runs rules
 pub struct Automaton<R: Ruleset> {
     cells: [Grid<R::State>; 2],
-    neighbor_data: Grid<R::NeighborData>,
+    neighbor_data: [Grid<R::NeighborData>; 2],
 }
 
 impl<R: Ruleset> Automaton<R> {
@@ -21,15 +21,24 @@ impl<R: Ruleset> Automaton<R> {
                 Grid::new(cols, rows),
                 Grid::new(cols, rows),
             ],
-            neighbor_data: Grid::new(cols + 2, rows + 2),
+            neighbor_data: [
+                Grid::new(cols + 2, rows + 2),
+                Grid::new(cols + 2, rows + 2),
+            ],
         }
     }
 
     /// Advances the grid to the next generation
     pub fn step(&mut self) {
+        if let ([a], [b]) = self.neighbor_data.split_at_mut(1) {
+            a.clone_from(b);
+        } else {
+            unreachable!()
+        }
+
         for (col, row) in self.cells[0].indices() {
             let current = &self.cells[0][(col, row)];
-            let neighbor_data = &self.neighbor_data[(col + 1, row + 1)];
+            let neighbor_data = &self.neighbor_data[0][(col + 1, row + 1)];
 
             let (next, update_neighbor) = R::next(current, neighbor_data);
             self.cells[1][(col, row)] = next;
@@ -64,12 +73,13 @@ impl<R: Ruleset> Automaton<R> {
 
     pub fn cols(&self) -> usize { self.cells[0].cols() }
     pub fn rows(&self) -> usize { self.cells[0].rows() }
+    pub fn grid(&self) -> &Grid<R::State> { &self.cells[0] }
 
     fn update_neighbors(&mut self, col: usize, row: usize, update: fn(&mut R::NeighborData)) {
         for n_col in col..(col + 3) {
             for n_row in row..(row + 3) {
                 if !(n_col == col + 1 && n_row == row + 1) {
-                    update(&mut self.neighbor_data[(n_col, n_row)]);
+                    update(&mut self.neighbor_data[1][(n_col, n_row)]);
                 }
             }
         }

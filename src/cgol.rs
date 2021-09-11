@@ -48,18 +48,35 @@ mod test {
     use crate::automaton::Automaton;
 
     #[test]
+    fn square() {
+        let mut cgol = Automaton::<Cgol>::new(5, 5);
+
+        cgol.set(1, 1, CgolCell::Live, |n| *n += 1);
+        cgol.set(1, 2, CgolCell::Live, |n| *n += 1);
+        cgol.set(2, 1, CgolCell::Live, |n| *n += 1);
+        cgol.set(2, 2, CgolCell::Live, |n| *n += 1);
+
+        let initial = cgol.grid().clone();
+
+        cgol.step();
+
+        assert_eq!(cgol.grid(), &initial);
+    }
+
+    #[test]
     fn blinker() {
         let mut cgol = Automaton::<Cgol>::new(5, 5);
         cgol.set(1, 2, CgolCell::Live, |n| *n += 1);
         cgol.set(2, 2, CgolCell::Live, |n| *n += 1);
         cgol.set(3, 2, CgolCell::Live, |n| *n += 1);
+        let mut state = cgol.grid().clone();
 
         cgol.step();
+        state[(1, 2)] = CgolCell::Dead;
+        state[(3, 2)] = CgolCell::Dead;
+        state[(2, 1)] = CgolCell::Live;
+        state[(2, 3)] = CgolCell::Live;
 
-        assert_eq!(cgol.get(2, 1), &CgolCell::Live);
-        assert_eq!(cgol.get(2, 2), &CgolCell::Live);
-        assert_eq!(cgol.get(2, 3), &CgolCell::Live);
-        assert_eq!(cgol.get(1, 2), &CgolCell::Dead);
-        assert_eq!(cgol.get(3, 2), &CgolCell::Dead);
+        assert_eq!(cgol.grid(), &state);
     }
 }

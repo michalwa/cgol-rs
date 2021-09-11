@@ -1,11 +1,12 @@
-use std::fmt::{self, Write};
 use crate::grid::Grid;
+
+pub type UpdateNeighbor<R> = Option<fn(&mut <R as Ruleset>::NeighborData)>;
 
 /// Defines cell state & next generation rules
 pub trait Ruleset {
     type State: Default + Clone;
     type NeighborData: Default + Clone;
-    fn next(s: &Self::State, n: &Self::NeighborData) -> (Self::State, fn(&mut Self::NeighborData));
+    fn next(s: &Self::State, n: &Self::NeighborData) -> (Self::State, UpdateNeighbor<Self>);
 }
 
 /// Stores cell state & runs rules
@@ -43,7 +44,9 @@ impl<R: Ruleset> Automaton<R> {
             let (next, update_neighbor) = R::next(current, neighbor_data);
             self.cells[1][(col, row)] = next;
 
-            self.update_neighbors(col, row, update_neighbor);
+            if let Some(update_neighbor) = update_neighbor {
+                self.update_neighbors(col, row, update_neighbor);
+            }
         }
 
         if let ([a], [b]) = self.cells.split_at_mut(1) {
@@ -83,20 +86,5 @@ impl<R: Ruleset> Automaton<R> {
                 }
             }
         }
-    }
-}
-
-impl<R: Ruleset> fmt::Display for Automaton<R>
-where
-    R::State: fmt::Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for row in 0..self.cells[0].rows() {
-            for col in 0..self.cells[0].cols() {
-                self.cells[0][(col, row)].fmt(f)?;
-            }
-            f.write_char('\n')?;
-        }
-        Ok(())
     }
 }

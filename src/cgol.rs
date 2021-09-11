@@ -1,5 +1,4 @@
-use std::fmt::{self, Write};
-use crate::automaton::Ruleset;
+use crate::automaton::{Ruleset, UpdateNeighbor};
 
 /// Conway's Game of Life ruleset
 pub struct Cgol;
@@ -8,16 +7,16 @@ impl Ruleset for Cgol {
     type State = CgolCell;
     type NeighborData = u8;
 
-    fn next(s: &Self::State, n: &Self::NeighborData) -> (Self::State, fn(&mut Self::NeighborData)) {
+    fn next(s: &Self::State, n: &Self::NeighborData) -> (Self::State, UpdateNeighbor<Self>) {
         match (s, n) {
             // Any live cell with two or three live neighbours survives
-            (&CgolCell::Live, 2..=3) => (CgolCell::Live, |_| {}),
+            (&CgolCell::Live(age), 2..=3) => (CgolCell::Live(age.saturating_add(1)), None),
             // Any dead cell with three live neighbours becomes a live cell
-            (&CgolCell::Dead, &n) if n == 3 => (CgolCell::Live, |n| *n += 1),
+            (&CgolCell::Dead, &n) if n == 3 => (CgolCell::Live(0), Some(|n| *n += 1)),
             // All other live cells die in the next generation
-            (&CgolCell::Live, _) => (CgolCell::Dead, |n| *n -= 1),
+            (&CgolCell::Live(_), _) => (CgolCell::Dead, Some(|n| *n -= 1)),
             // Similarly, all other dead cells stay dead
-            (&CgolCell::Dead, _) => (CgolCell::Dead, |_| {}),
+            (&CgolCell::Dead, _) => (CgolCell::Dead, None),
         }
     }
 }
@@ -26,20 +25,11 @@ impl Ruleset for Cgol {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CgolCell {
     Dead,
-    Live,
+    Live(u8),
 }
 
 impl Default for CgolCell {
     fn default() -> Self { Self::Dead }
-}
-
-impl fmt::Display for CgolCell {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_char(match self {
-            CgolCell::Dead => '.',
-            CgolCell::Live => '@',
-        })
-    }
 }
 
 #[cfg(test)]
@@ -51,10 +41,10 @@ mod test {
     fn square() {
         let mut cgol = Automaton::<Cgol>::new(5, 5);
 
-        cgol.set(1, 1, CgolCell::Live, |n| *n += 1);
-        cgol.set(1, 2, CgolCell::Live, |n| *n += 1);
-        cgol.set(2, 1, CgolCell::Live, |n| *n += 1);
-        cgol.set(2, 2, CgolCell::Live, |n| *n += 1);
+        cgol.set(1, 1, CgolCell::Live(0), |n| *n += 1);
+        cgol.set(1, 2, CgolCell::Live(0), |n| *n += 1);
+        cgol.set(2, 1, CgolCell::Live(0), |n| *n += 1);
+        cgol.set(2, 2, CgolCell::Live(0), |n| *n += 1);
 
         let initial = cgol.grid().clone();
 
@@ -66,16 +56,16 @@ mod test {
     #[test]
     fn blinker() {
         let mut cgol = Automaton::<Cgol>::new(5, 5);
-        cgol.set(1, 2, CgolCell::Live, |n| *n += 1);
-        cgol.set(2, 2, CgolCell::Live, |n| *n += 1);
-        cgol.set(3, 2, CgolCell::Live, |n| *n += 1);
+        cgol.set(1, 2, CgolCell::Live(0), |n| *n += 1);
+        cgol.set(2, 2, CgolCell::Live(0), |n| *n += 1);
+        cgol.set(3, 2, CgolCell::Live(0), |n| *n += 1);
         let mut state = cgol.grid().clone();
 
         cgol.step();
         state[(1, 2)] = CgolCell::Dead;
         state[(3, 2)] = CgolCell::Dead;
-        state[(2, 1)] = CgolCell::Live;
-        state[(2, 3)] = CgolCell::Live;
+        state[(2, 1)] = CgolCell::Live(0);
+        state[(2, 3)] = CgolCell::Live(0);
 
         assert_eq!(cgol.grid(), &state);
     }

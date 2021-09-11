@@ -8,3 +8,5 @@ edition = "2018"
 name = "seagull"
 
 [dependencies]
+piston_window = "0.120"
+rand = "0.8"

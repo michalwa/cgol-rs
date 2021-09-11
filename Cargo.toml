@@ -4,4 +4,7 @@ version = "0.1.0"
 authors = ["michalwa <michalwa2003@gmail.com>"]
 edition = "2018"
 
+[lib]
+name = "seagull"
+
 [dependencies]

@@ -1,10 +1,15 @@
 use piston_window::*;
-use seagull::{cgol::CgolCell, Automaton, Cgol};
+use seagull::{Automaton, Cgol, cgol::{self, CgolCell}, grid::Grid};
 use std::time::{Duration, Instant};
 
 fn main() {
-    let cell_size: f64 = 15.0;
-    let mut cgol = Automaton::<Cgol>::new(50, 50);
+    let brushes: &[&Grid<CgolCell>] = &[
+        &cgol::patterns::BLOCK_1,
+        &cgol::patterns::GLIDER,
+    ];
+
+    let cell_size: f64 = 8.0;
+    let mut cgol = Automaton::<Cgol>::new(100, 100);
 
     let mut window: PistonWindow = WindowSettings::new(
         "Conway's Game of Life",
@@ -17,18 +22,20 @@ fn main() {
     .build()
     .unwrap();
 
-    let update_interval = Duration::from_millis(50);
+    let mut step_millis = 64;
     let mut last_update = Instant::now();
     let mut running = false;
-    let mut mouse_pos = [0f64; 2];
+    let mut cursor = [0usize; 2];
+    let mut brush_idx: usize = 0;
 
     while let Some(event) = window.next() {
         window.draw_2d(&event, |c, g, _| {
             clear([0.0, 0.0, 0.0, 1.0], g);
 
+            // Draw cells
             for ((col, row), state) in cgol.cells() {
                 if let &CgolCell::Live(age) = state {
-                    let lightness = 1.0 / age.saturating_add(1) as f32;
+                    let lightness = 0.1f32.max(1.0 / age.saturating_add(1) as f32);
                     rectangle(
                         [lightness, lightness, lightness, 1.0],
                         [col as f64 * cell_size, row as f64 * cell_size, cell_size, cell_size],
@@ -38,50 +45,65 @@ fn main() {
                 }
             }
 
-            let cursor_col = (mouse_pos[0] / cell_size) as usize;
-            let cursor_row = (mouse_pos[1] / cell_size) as usize;
-            rectangle(
-                [1.0, 1.0, 0.0, 0.5],
-                [cursor_col as f64 * cell_size, cursor_row as f64 * cell_size, cell_size, cell_size],
-                c.transform,
-                g
-            );
+            // Draw brush
+            for ((col, row), cell) in brushes[brush_idx] {
+                if let &CgolCell::Live(_) = cell {
+                    let col = cursor[0] as isize + col as isize
+                        - brushes[brush_idx].cols() as isize / 2;
+
+                    let row = cursor[1] as isize + row as isize
+                        - brushes[brush_idx].rows() as isize / 2;
+
+                    rectangle(
+                        [1.0, 1.0, 0.0, 0.2],
+                        [col as f64 * cell_size, row as f64 * cell_size, cell_size, cell_size],
+                        c.transform,
+                        g
+                    );
+                }
+            }
         });
 
         if let Some(button) = event.press_args() {
             match button {
                 Button::Keyboard(Key::Space) => running = !running,
                 Button::Keyboard(Key::C) => cgol.clear(),
+                Button::Keyboard(Key::Up) => step_millis = (step_millis / 2).max(16),
+                Button::Keyboard(Key::Down) => step_millis = (step_millis * 2).min(2048),
                 Button::Keyboard(Key::R) => {
                     use rand::random;
                     cgol.clear();
                     for (col, row) in cgol.cells().indices() {
                         if random::<bool>() {
-                            cgol.set(col, row, CgolCell::Live(0));
+                            cgol.set_cell(col, row, CgolCell::Live(0));
                         }
                     }
                 }
+                Button::Keyboard(Key::B) => brush_idx = (brush_idx + 1) % brushes.len(),
                 Button::Mouse(MouseButton::Left) => {
-                    let col = (mouse_pos[0] / cell_size) as usize;
-                    let row = (mouse_pos[1] / cell_size) as usize;
+                    let col = cursor[0] as isize - brushes[brush_idx].cols() as isize / 2;
+                    let row = cursor[1] as isize - brushes[brush_idx].rows() as isize / 2;
 
-                    if cgol.get(col, row) == &CgolCell::Dead {
-                        cgol.set(col, row, CgolCell::Live(0));
+                    if brush_idx == 0 {
+                        cgol.with_cell_mut(col as usize, row as usize, |cell| cell.toggle());
                     } else {
-                        cgol.set(col, row, CgolCell::Dead);
+                        cgol.put(brushes[brush_idx], col, row);
                     }
                 }
                 _ => (),
             }
         }
 
-        if let Some(pos) = event.mouse_cursor_args() {
-            mouse_pos = pos;
+        if let Some([x, y]) = event.mouse_cursor_args() {
+            cursor = [
+                (x / cell_size) as usize,
+                (y / cell_size) as usize,
+            ];
         }
 
         if running {
             let now = Instant::now();
-            if now - last_update >= update_interval {
+            if now - last_update >= Duration::from_millis(step_millis) {
                 last_update = now;
                 cgol.step();
             }

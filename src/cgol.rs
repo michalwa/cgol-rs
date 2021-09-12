@@ -36,8 +36,46 @@ pub enum CgolCell {
     Live(u8),
 }
 
+impl CgolCell {
+    pub fn toggle(&mut self) {
+        *self = match *self {
+            Self::Dead => Self::Live(0),
+            Self::Live(_) => Self::Dead,
+        };
+    }
+}
+
 impl Default for CgolCell {
     fn default() -> Self { Self::Dead }
+}
+
+pub mod patterns {
+    use super::*;
+    use crate::grid::Grid;
+    use lazy_static::lazy_static;
+
+    fn from_slice(cols: usize, rows: usize, pattern: &[u8]) -> Grid<CgolCell> {
+        Grid::from_slice(cols, rows, pattern
+            .iter()
+            .map(|n| match n {
+                0 => CgolCell::Dead,
+                _ => CgolCell::Live(0),
+            })
+            .collect::<Vec<_>>()
+            .as_ref()
+        )
+    }
+
+    lazy_static! {
+        pub static ref BLOCK_1: Grid<CgolCell> = from_slice(1, 1, &[1]);
+
+        pub static ref GLIDER: Grid<CgolCell> =
+            from_slice(3, 3, &[
+                0, 1, 0,
+                0, 0, 1,
+                1, 1, 1,
+            ]);
+    }
 }
 
 #[cfg(test)]
@@ -49,10 +87,10 @@ mod test {
     fn square() {
         let mut cgol = Automaton::<Cgol>::new(5, 5);
 
-        cgol.set(1, 1, CgolCell::Live(0));
-        cgol.set(1, 2, CgolCell::Live(0));
-        cgol.set(2, 1, CgolCell::Live(0));
-        cgol.set(2, 2, CgolCell::Live(0));
+        cgol.set_cell(1, 1, CgolCell::Live(0));
+        cgol.set_cell(1, 2, CgolCell::Live(0));
+        cgol.set_cell(2, 1, CgolCell::Live(0));
+        cgol.set_cell(2, 2, CgolCell::Live(0));
 
         let mut initial = cgol.cells().clone();
 
@@ -67,9 +105,9 @@ mod test {
     #[test]
     fn blinker() {
         let mut cgol = Automaton::<Cgol>::new(5, 5);
-        cgol.set(1, 2, CgolCell::Live(0));
-        cgol.set(2, 2, CgolCell::Live(0));
-        cgol.set(3, 2, CgolCell::Live(0));
+        cgol.set_cell(1, 2, CgolCell::Live(0));
+        cgol.set_cell(2, 2, CgolCell::Live(0));
+        cgol.set_cell(3, 2, CgolCell::Live(0));
         let mut state = cgol.cells().clone();
 
         cgol.step();

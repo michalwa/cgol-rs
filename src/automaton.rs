@@ -64,14 +64,31 @@ impl<R: Ruleset> Automaton<R> {
         }
     }
 
-    /// Returns current cell state at the specified coordinates
-    pub fn get(&self, col: usize, row: usize) -> &R::State {
+    /// Returns the current cell state at the specified coordinates
+    pub fn cell(&self, col: usize, row: usize) -> &R::State {
         &self.cells[0][(col, row)]
+    }
+
+    /// Returns a mutable reference to the current cell state at the specified coordinates
+    pub fn with_cell_mut<F, O>(&mut self, col: usize, row: usize, f: F) -> O
+    where
+        F: FnOnce(&mut R::State) -> O,
+    {
+        let prev = self.cells[0][(col, row)].clone();
+        let result = f(&mut self.cells[0][(col, row)]);
+
+        if let Some(update_neighbor) = R::update_neighbor(&prev, &self.cells[0][(col, row)]) {
+            self.update_neighbors(col, row, update_neighbor);
+        }
+
+        result
     }
 
     /// Sets the cell state at the specified coordinates and updates its neighbors
     /// using the given function
-    pub fn set(&mut self, col: usize, row: usize, new: R::State) {
+    pub fn set_cell(&mut self, col: usize, row: usize, new: R::State) {
+        if col >= self.cols() || row >= self.rows() { return }
+
         let current = &self.cells[0][(col, row)];
 
         if let Some(update_neighbor) = R::update_neighbor(current, &new) {
@@ -81,11 +98,22 @@ impl<R: Ruleset> Automaton<R> {
         self.cells[0][(col, row)] = new;
     }
 
+    /// Copies the given pattern onto the grid in the specified location
+    pub fn put(&mut self, pattern: &Grid<R::State>, left: isize, top: isize) {
+        for ((col, row), cell) in pattern {
+            let col = left + col as isize;
+            let row = top + row as isize;
+
+            if col >= 0 && row >= 0 {
+                self.set_cell(col as usize, row as usize, cell.clone());
+            }
+        }
+    }
+
     pub fn cols(&self) -> usize { self.cells[0].cols() }
     pub fn rows(&self) -> usize { self.cells[0].rows() }
 
     pub fn cells(&self) -> &Grid<R::State> { &self.cells[0] }
-    pub fn cells_mut(&mut self) -> &mut Grid<R::State> { &mut self.cells[0] }
 
     fn update_neighbors(&mut self, col: usize, row: usize, update: fn(&mut R::NeighborData)) {
         for n_col in col..(col + 3) {

@@ -21,6 +21,25 @@ impl<T> Grid<T> {
         }
     }
 
+    pub fn from_slice(cols: usize, rows: usize, slice: &[T]) -> Self
+    where
+        T: Default + Clone,
+    {
+        assert_eq!(cols * rows, slice.len());
+        let mut g = Self::new(cols, rows);
+        g.data.clone_from_slice(slice);
+        g
+    }
+
+    pub fn clone_from(&mut self, src: &Self)
+    where
+        T: Clone,
+    {
+        assert_eq!(self.cols, src.cols);
+        assert_eq!(self.rows, src.rows);
+        self.data.clone_from_slice(&src.data);
+    }
+
     /// Sets each cell to the default value
     pub fn clear(&mut self)
     where
@@ -48,13 +67,7 @@ impl<T> Grid<T> {
         }
     }
 
-    pub fn clone_from(&mut self, src: &Self)
-    where
-        T: Clone,
-    {
-        assert!(self.cols == src.cols && self.rows == src.rows);
-        self.data.clone_from_slice(&src.data);
-    }
+
 
     pub const fn cols(&self) -> usize { self.cols }
     pub const fn rows(&self) -> usize { self.rows }

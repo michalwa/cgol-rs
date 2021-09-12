@@ -6,11 +6,16 @@ use seagull::{
 };
 use std::time::{Duration, Instant};
 
-fn main() {
-    let brushes: &[&Grid<CgolCell>] = &[&cgol::patterns::BLOCK_1, &cgol::patterns::GLIDER];
+type Brush<'a> = (&'static str, &'a Grid<CgolCell>);
 
-    let cell_size: f64 = 8.0;
-    let mut cgol = Automaton::<Cgol>::new(100, 100);
+fn main() {
+    let brushes: &[Brush] = &[
+        ("1x1", &cgol::patterns::BLOCK_1),
+        ("glider", &cgol::patterns::GLIDER),
+    ];
+
+    let cell_size: f64 = 4.0;
+    let mut cgol = Automaton::<Cgol>::new(200, 200);
 
     let mut window: PistonWindow = WindowSettings::new(
         "Conway's Game of Life",
@@ -27,6 +32,10 @@ fn main() {
     let texture_ctx = window.create_texture_context();
     let mut font = Glyphs::from_bytes(font_data, texture_ctx, TextureSettings::new()).unwrap();
 
+    let min_step_millis = 16;
+    let max_step_millis = 1024;
+
+    let mut generation = 0u32;
     let mut step_millis = 64;
     let mut last_update = Instant::now();
     let mut running = false;
@@ -62,13 +71,14 @@ fn main() {
             }
 
             // Draw brush
-            for ((col, row), cell) in brushes[brush_idx] {
+            let brush = brushes[brush_idx].1;
+            for ((col, row), cell) in brush {
                 if let &CgolCell::Live(_) = cell {
                     let col =
-                        cursor[0] as isize + col as isize - brushes[brush_idx].cols() as isize / 2;
+                        cursor[0] as isize + col as isize - brush.cols() as isize / 2;
 
                     let row =
-                        cursor[1] as isize + row as isize - brushes[brush_idx].rows() as isize / 2;
+                        cursor[1] as isize + row as isize - brush.rows() as isize / 2;
 
                     rectangle(
                         [1.0, 1.0, 0.0, 0.2],
@@ -86,17 +96,25 @@ fn main() {
 
             // Draw info
             let info = format!(
-                "{}\nstep: {}ms\nbrush: {}\nshow age: {:?}",
+                concat!(
+                    "{:<9}[Space]\n",
+                    "step     [Up/Down]: {}ms\n",
+                    "brush    [B]:       {}\n",
+                    "show age [A]:       {:?}\n",
+                    "\n",
+                    "generation: {}\n",
+                ),
                 if running { "running" } else { "paused" },
                 step_millis,
-                brush_idx,
+                brushes[brush_idx].0,
                 show_age,
+                generation,
             );
 
             for (i, line) in info.lines().enumerate() {
                 text(
-                    [0.6, 0.7, 1.0, 0.3], 14, line,
-                    &mut font, c.transform.trans(10.0, (i + 1) as f64 * 20.0), g,
+                    [0.6, 0.7, 1.0, 1.0], 10, line,
+                    &mut font, c.transform.trans(10.0, (i + 1) as f64 * 14.0 + 10.0), g,
                 )
                 .unwrap();
             }
@@ -109,8 +127,8 @@ fn main() {
                 Button::Keyboard(Key::Space) => running = !running,
                 Button::Keyboard(Key::C) => cgol.clear(),
                 Button::Keyboard(Key::A) => show_age = !show_age,
-                Button::Keyboard(Key::Up) => step_millis = (step_millis / 2).max(16),
-                Button::Keyboard(Key::Down) => step_millis = (step_millis * 2).min(2048),
+                Button::Keyboard(Key::Up) => step_millis = (step_millis / 2).max(min_step_millis),
+                Button::Keyboard(Key::Down) => step_millis = (step_millis * 2).min(max_step_millis),
                 Button::Keyboard(Key::R) => {
                     use rand::random;
                     cgol.clear();
@@ -122,13 +140,14 @@ fn main() {
                 }
                 Button::Keyboard(Key::B) => brush_idx = (brush_idx + 1) % brushes.len(),
                 Button::Mouse(MouseButton::Left) => {
-                    let col = cursor[0] as isize - brushes[brush_idx].cols() as isize / 2;
-                    let row = cursor[1] as isize - brushes[brush_idx].rows() as isize / 2;
+                    let brush = brushes[brush_idx].1;
+                    let col = cursor[0] as isize - brush.cols() as isize / 2;
+                    let row = cursor[1] as isize - brush.rows() as isize / 2;
 
                     if brush_idx == 0 {
                         cgol.with_cell_mut(col as usize, row as usize, |cell| cell.toggle());
                     } else {
-                        cgol.put(brushes[brush_idx], col, row);
+                        cgol.put(brush, col, row);
                     }
                 }
                 _ => (),
@@ -144,6 +163,7 @@ fn main() {
             if now - last_update >= Duration::from_millis(step_millis) {
                 last_update = now;
                 cgol.step();
+                generation += 1;
             }
         }
     }

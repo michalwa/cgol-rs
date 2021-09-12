@@ -116,13 +116,16 @@ impl<R: Ruleset> Automaton<R> {
     pub fn cells(&self) -> &Grid<R::State> { &self.cells[0] }
 
     fn update_neighbors(&mut self, col: usize, row: usize, update: fn(&mut R::NeighborData)) {
-        for n_col in col..(col + 3) {
-            for n_row in row..(row + 3) {
-                if !(n_col == col + 1 && n_row == row + 1) {
-                    update(&mut self.neighbor_data[1][(n_col, n_row)]);
-                }
-            }
-        }
+        update(&mut self.neighbor_data[1][(col,     row)]);
+        update(&mut self.neighbor_data[1][(col + 1, row)]);
+        update(&mut self.neighbor_data[1][(col + 2, row)]);
+
+        update(&mut self.neighbor_data[1][(col,     row + 1)]);
+        update(&mut self.neighbor_data[1][(col + 2, row + 1)]);
+
+        update(&mut self.neighbor_data[1][(col,     row + 2)]);
+        update(&mut self.neighbor_data[1][(col + 1, row + 2)]);
+        update(&mut self.neighbor_data[1][(col + 2, row + 2)]);
     }
 
     pub fn clear(&mut self) {

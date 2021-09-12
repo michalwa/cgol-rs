@@ -9,8 +9,8 @@ fn main() {
     let mut window: PistonWindow = WindowSettings::new(
         "Conway's Game of Life",
         [
-            cgol.grid().cols() as f64 * cell_size,
-            cgol.grid().rows() as f64 * cell_size,
+            cgol.cells().cols() as f64 * cell_size,
+            cgol.cells().rows() as f64 * cell_size,
         ],
     )
     .resizable(false)
@@ -26,11 +26,11 @@ fn main() {
         window.draw_2d(&event, |c, g, _| {
             clear([0.0, 0.0, 0.0, 1.0], g);
 
-            for ((col, row), state) in cgol.grid() {
+            for ((col, row), state) in cgol.cells() {
                 if let &CgolCell::Live(age) = state {
                     let lightness = 1.0 / age.saturating_add(1) as f32;
                     rectangle(
-                        [lightness, lightness, lightness, if running { 1.0 } else { 0.05 }],
+                        [lightness, lightness, lightness, 1.0],
                         [col as f64 * cell_size, row as f64 * cell_size, cell_size, cell_size],
                         c.transform,
                         g,
@@ -55,9 +55,9 @@ fn main() {
                 Button::Keyboard(Key::R) => {
                     use rand::random;
                     cgol.clear();
-                    for (col, row) in cgol.grid().indices() {
+                    for (col, row) in cgol.cells().indices() {
                         if random::<bool>() {
-                            cgol.set(col, row, CgolCell::Live(0), Some(|n| *n += 1));
+                            cgol.set(col, row, CgolCell::Live(0));
                         }
                     }
                 }
@@ -66,9 +66,9 @@ fn main() {
                     let row = (mouse_pos[1] / cell_size) as usize;
 
                     if cgol.get(col, row) == &CgolCell::Dead {
-                        cgol.set(col, row, CgolCell::Live(0), Some(|n| *n += 1));
+                        cgol.set(col, row, CgolCell::Live(0));
                     } else {
-                        cgol.set(col, row, CgolCell::Dead, Some(|n| *n -= 1));
+                        cgol.set(col, row, CgolCell::Dead);
                     }
                 }
                 _ => (),

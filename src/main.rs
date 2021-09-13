@@ -6,115 +6,92 @@ use seagull::{
 };
 use std::time::{Duration, Instant};
 
+mod renderer;
+use renderer::Renderer;
+
+mod utils;
+use utils::RangeExt;
+
 type Brush<'a> = (&'static str, &'a Grid<CgolCell>);
 
 fn main() {
     let brushes: &[Brush] = &[
         ("1x1", &cgol::patterns::BLOCK_1),
+        ("2x2", &cgol::patterns::BLOCK_2),
+        ("beehive", &cgol::patterns::BEEHIVE),
+        ("loaf", &cgol::patterns::LOAF),
+        ("boat", &cgol::patterns::BOAT),
+        ("tub", &cgol::patterns::TUB),
+
+        ("blinker", &cgol::patterns::BLINKER),
+        ("toad", &cgol::patterns::TOAD),
+        ("beacon", &cgol::patterns::BEACON),
+        ("pulsar", &cgol::patterns::PULSAR),
+
         ("glider", &cgol::patterns::GLIDER),
+        ("light-weight spaceship", &cgol::patterns::LWSS),
+        ("middle-weight spaceship", &cgol::patterns::MWSS),
     ];
 
-    let cell_size: f64 = 4.0;
-    let mut cgol = Automaton::<Cgol>::new(200, 200);
+    let dims = [200, 200];
+    let mut cgol = Automaton::<Cgol>::new(dims);
 
-    let mut window: PistonWindow = WindowSettings::new(
-        "Conway's Game of Life",
-        [
-            cgol.cells().cols() as f64 * cell_size,
-            cgol.cells().rows() as f64 * cell_size,
-        ],
-    )
-    .resizable(false)
-    .build()
-    .unwrap();
+    let mut renderer = Renderer {
+        cell_size: 4.0,
+        show_age: true,
+    };
+
+    let mut window: PistonWindow =
+        WindowSettings::new("Conway's Game of Life", renderer.window_size(dims))
+            .resizable(false)
+            .build()
+            .unwrap();
 
     let font_data = include_bytes!("../res/CONSOLA.TTF");
     let texture_ctx = window.create_texture_context();
     let mut font = Glyphs::from_bytes(font_data, texture_ctx, TextureSettings::new()).unwrap();
 
-    let min_step_millis = 16;
-    let max_step_millis = 1024;
-
-    let mut generation = 0u32;
-    let mut step_millis = 64;
-    let mut last_update = Instant::now();
     let mut running = false;
     let mut cursor = [0usize; 2];
+    let mut last_update = Instant::now();
+    let mut generation = 0u32;
+
+    let mut step_millis = 64;
+    let step_millis_range = 16..=1024;
     let mut brush_idx: usize = 0;
-    let mut show_age = true;
 
     while let Some(event) = window.next() {
         window.draw_2d(&event, |c, g, device| {
             clear([0.0, 0.0, 0.0, 1.0], g);
 
-            // Draw cells
-            for ((col, row), state) in cgol.cells() {
-                if let &CgolCell::Live(age) = state {
-                    let lightness = if show_age {
-                        0.1f32.max(1.0 / age.saturating_add(1) as f32)
-                    } else {
-                        1.0
-                    };
-
-                    rectangle(
-                        [lightness, lightness, lightness, 1.0],
-                        [
-                            col as f64 * cell_size,
-                            row as f64 * cell_size,
-                            cell_size,
-                            cell_size,
-                        ],
-                        c.transform,
-                        g,
-                    );
-                }
-            }
-
-            // Draw brush
-            let brush = brushes[brush_idx].1;
-            for ((col, row), cell) in brush {
-                if let &CgolCell::Live(_) = cell {
-                    let col =
-                        cursor[0] as isize + col as isize - brush.cols() as isize / 2;
-
-                    let row =
-                        cursor[1] as isize + row as isize - brush.rows() as isize / 2;
-
-                    rectangle(
-                        [1.0, 1.0, 0.0, 0.2],
-                        [
-                            col as f64 * cell_size,
-                            row as f64 * cell_size,
-                            cell_size,
-                            cell_size,
-                        ],
-                        c.transform,
-                        g,
-                    );
-                }
-            }
+            renderer.draw_grid(cgol.cells(), c, g);
+            renderer.draw_brush(brushes[brush_idx].1, cursor, c, g);
 
             // Draw info
             let info = format!(
                 concat!(
-                    "{:<9}[Space]\n",
-                    "step     [Up/Down]: {}ms\n",
-                    "brush    [B]:       {}\n",
-                    "show age [A]:       {:?}\n",
+                    "  [Space] {}\n",
+                    "[Up/Down] step:     {}ms\n",
+                    "      [B] brush:    {}\n",
+                    "      [A] show age: {:?}\n",
+                    "      [R] randomize\n",
+                    "      [C] clear\n",
                     "\n",
                     "generation: {}\n",
                 ),
                 if running { "running" } else { "paused" },
                 step_millis,
                 brushes[brush_idx].0,
-                show_age,
+                renderer.show_age,
                 generation,
             );
 
+            let text_color = [0.6, 0.7, 1.0, 1.0];
             for (i, line) in info.lines().enumerate() {
                 text(
-                    [0.6, 0.7, 1.0, 1.0], 10, line,
-                    &mut font, c.transform.trans(10.0, (i + 1) as f64 * 14.0 + 10.0), g,
+                    text_color, 10, line, &mut font,
+                    c.transform.trans(10.0, (i + 1) as f64 * 14.0 + 10.0),
+                    g,
                 )
                 .unwrap();
             }
@@ -126,9 +103,9 @@ fn main() {
             match button {
                 Button::Keyboard(Key::Space) => running = !running,
                 Button::Keyboard(Key::C) => cgol.clear(),
-                Button::Keyboard(Key::A) => show_age = !show_age,
-                Button::Keyboard(Key::Up) => step_millis = (step_millis / 2).max(min_step_millis),
-                Button::Keyboard(Key::Down) => step_millis = (step_millis * 2).min(max_step_millis),
+                Button::Keyboard(Key::A) => renderer.show_age = !renderer.show_age,
+                Button::Keyboard(Key::Up) => step_millis = step_millis_range.clamp(step_millis / 2),
+                Button::Keyboard(Key::Down) => step_millis = step_millis_range.clamp(step_millis * 2),
                 Button::Keyboard(Key::R) => {
                     use rand::random;
                     cgol.clear();
@@ -154,8 +131,8 @@ fn main() {
             }
         }
 
-        if let Some([x, y]) = event.mouse_cursor_args() {
-            cursor = [(x / cell_size) as usize, (y / cell_size) as usize];
+        if let Some(pos) = event.mouse_cursor_args() {
+            cursor = renderer.pos_to_indices(pos);
         }
 
         if running {

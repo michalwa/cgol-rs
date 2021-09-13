@@ -23,7 +23,7 @@ pub struct Automaton<R: Ruleset> {
 }
 
 impl<R: Ruleset> Automaton<R> {
-    pub fn new(cols: usize, rows: usize) -> Self {
+    pub fn new([cols, rows]: [usize; 2]) -> Self {
         Self {
             cells: [
                 Grid::new(cols, rows),
